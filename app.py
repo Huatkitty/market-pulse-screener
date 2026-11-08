@@ -4,6 +4,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import warnings
+import plotly.graph_objects as go
 
 warnings.filterwarnings("ignore")
 
@@ -29,11 +30,14 @@ FG_THRESH = 30
 
 
 # ============================================================
-# DARK DASHBOARD THEME
+# DASHBOARD THEME
 # ============================================================
 
 st.markdown("""
 <style>
+
+/* Main background */
+
 .stApp {
     background-color: #0B1120;
     color: #F8FAFC;
@@ -49,6 +53,8 @@ header[data-testid="stHeader"] {
     max-width: 1400px;
 }
 
+/* Headings */
+
 h1, h2, h3 {
     color: #F8FAFC !important;
 }
@@ -57,20 +63,40 @@ p, label {
     color: #CBD5E1;
 }
 
+/* White Market Overview cards */
+
 [data-testid="stMetric"] {
-    background: #151F32;
-    border: 1px solid #263449;
+    background: #FFFFFF !important;
+    border: 1px solid #D1D5DB;
     padding: 18px;
     border-radius: 12px;
 }
 
-[data-testid="stMetricLabel"] {
-    color: #94A3B8 !important;
+[data-testid="stMetricLabel"],
+[data-testid="stMetricLabel"] p {
+    color: #374151 !important;
 }
 
-[data-testid="stMetricValue"] {
-    color: #F8FAFC !important;
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] div {
+    color: #111827 !important;
 }
+
+/* White Trading Decision alert */
+
+div[data-testid="stAlert"] {
+    background-color: #FFFFFF !important;
+    border: 1px solid #D1D5DB !important;
+    border-radius: 12px;
+}
+
+div[data-testid="stAlert"] p,
+div[data-testid="stAlert"] div,
+div[data-testid="stAlert"] span {
+    color: #111827 !important;
+}
+
+/* Buttons */
 
 .stButton > button {
     background-color: #1E293B;
@@ -86,17 +112,17 @@ p, label {
     border-color: #64748B;
 }
 
+/* Dataframes */
+
 div[data-testid="stDataFrame"] {
     border: 1px solid #263449;
     border-radius: 10px;
 }
 
+/* Dividers */
+
 hr {
     border-color: #263449;
-}
-
-div[data-testid="stAlert"] {
-    border-radius: 10px;
 }
 
 </style>
@@ -105,7 +131,7 @@ div[data-testid="stAlert"] {
 
 # ============================================================
 # FEAR & GREED CALCULATION
-# ORIGINAL LOGIC - UNCHANGED
+# ORIGINAL FORMULA - UNCHANGED
 # ============================================================
 
 def calculate_fg(close_series, vix_series):
@@ -140,7 +166,7 @@ def calculate_fg(close_series, vix_series):
 
 
 # ============================================================
-# DOWNLOAD AND PROCESS MARKET DATA
+# MARKET DATA DOWNLOAD
 # ============================================================
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -157,27 +183,49 @@ def load_market_data():
     )
 
     if data.empty:
-        raise ValueError("Yahoo Finance returned no market data.")
+        raise ValueError(
+            "Yahoo Finance returned no market data."
+        )
+
+    # Handle either MultiIndex column arrangement
+    def get_close(ticker):
+
+        if isinstance(data.columns, pd.MultiIndex):
+
+            if ticker in data.columns.get_level_values(0):
+                return data[ticker]["Close"].astype(float)
+
+            if ticker in data.columns.get_level_values(1):
+                return data.xs(
+                    ticker,
+                    axis=1,
+                    level=1
+                )["Close"].astype(float)
+
+            raise ValueError(
+                f"Missing market data for {ticker}."
+            )
+
+        raise ValueError(
+            "Unexpected Yahoo Finance data format."
+        )
 
     df = pd.DataFrame()
 
     for ticker in ASSETS:
+        df[f"{ticker}_Close"] = get_close(ticker)
 
-        if ticker not in data.columns.get_level_values(0):
-            raise ValueError(f"Missing market data for {ticker}.")
+    df["VIX"] = get_close("^VIX")
 
-        df[f"{ticker}_Close"] = data[ticker]["Close"].astype(float)
-
-    if "^VIX" not in data.columns.get_level_values(0):
-        raise ValueError("VIX market data is unavailable.")
-
-    df["VIX"] = data["^VIX"]["Close"].astype(float)
-
+    # Preserve original complete-row filtering
     df = df.dropna()
 
     if df.empty:
-        raise ValueError("No complete market data available.")
+        raise ValueError(
+            "No complete market data available."
+        )
 
+    # Calculate Fear & Greed for each ETF
     for ticker in ASSETS:
 
         df[f"{ticker}_FG"] = calculate_fg(
@@ -202,7 +250,12 @@ with header_left:
 
 with header_right:
 
-    if st.button("↻ Refresh Data", use_container_width=True):
+    st.write("")
+
+    if st.button(
+        "↻ Refresh Data",
+        use_container_width=True
+    ):
 
         st.cache_data.clear()
         st.rerun()
@@ -216,13 +269,17 @@ st.divider()
 
 try:
 
-    with st.spinner("Fetching market data from Yahoo Finance..."):
+    with st.spinner(
+        "Fetching market data from Yahoo Finance..."
+    ):
 
         df = load_market_data()
 
 except Exception as error:
 
-    st.error(f"Unable to retrieve market data: {error}")
+    st.error(
+        f"Unable to retrieve market data: {error}"
+    )
 
     st.info(
         "Please wait a moment and refresh the application. "
@@ -270,16 +327,32 @@ st.subheader("Market Overview")
 m1, m2, m3, m4 = st.columns(4)
 
 with m1:
-    st.metric("SIGNAL DATE", latest_date)
+
+    st.metric(
+        "SIGNAL DATE",
+        latest_date
+    )
 
 with m2:
-    st.metric("BUY SIGNALS", len(buy_signals))
+
+    st.metric(
+        "BUY SIGNALS",
+        len(buy_signals)
+    )
 
 with m3:
-    st.metric("FG THRESHOLD", f"< {FG_THRESH}")
+
+    st.metric(
+        "FG THRESHOLD",
+        f"< {FG_THRESH}"
+    )
 
 with m4:
-    st.metric("ASSETS MONITORED", len(ASSETS))
+
+    st.metric(
+        "ASSETS MONITORED",
+        len(ASSETS)
+    )
 
 
 # ============================================================
@@ -338,10 +411,9 @@ st.subheader("Trading Decision")
 if buy_signals:
 
     st.success(
-        f"⚡ ACTION REQUIRED TOMORROW\n\n"
+        "⚡ ACTION REQUIRED TOMORROW\n\n"
         f"BUY {' + '.join(buy_signals)}\n\n"
-        f"Execution: Next Trading Day Open\n\n"
-        f"Suggested order type: Market-On-Open (MOO)"
+        "Execution: Next Trading Day Open"
     )
 
 else:
@@ -383,7 +455,9 @@ for date, row in signal_days.iterrows():
 
     history.append({
         "Date": date.strftime("%d %b %Y"),
-        "Triggered Assets": " · ".join(triggered_tickers)
+        "Triggered Assets": " · ".join(
+            triggered_tickers
+        )
     })
 
 if history:
@@ -402,7 +476,7 @@ else:
 
 
 # ============================================================
-# FEAR & GREED TREND
+# FEAR & GREED TREND WITH COLOUR ZONES
 # ============================================================
 
 st.divider()
@@ -421,13 +495,174 @@ chart_df = df[
 
 chart_df.columns = ["Fear & Greed Score"]
 
-st.line_chart(
-    chart_df,
-    color="#4ADE80"
+fig = go.Figure()
+
+
+# ------------------------------------------------------------
+# COLOUR ZONES
+# ------------------------------------------------------------
+
+# Red: 0–30
+fig.add_hrect(
+    y0=0,
+    y1=30,
+    fillcolor="rgba(239, 68, 68, 0.28)",
+    line_width=0,
+    layer="below"
+)
+
+# Light yellow: 30–40
+fig.add_hrect(
+    y0=30,
+    y1=40,
+    fillcolor="rgba(250, 204, 21, 0.25)",
+    line_width=0,
+    layer="below"
+)
+
+# Neutral: 40–60
+# Remains dark background intentionally
+
+# Light green: 60–80
+fig.add_hrect(
+    y0=60,
+    y1=80,
+    fillcolor="rgba(134, 239, 172, 0.22)",
+    line_width=0,
+    layer="below"
+)
+
+# Green: 80–100
+fig.add_hrect(
+    y0=80,
+    y1=100,
+    fillcolor="rgba(34, 197, 94, 0.30)",
+    line_width=0,
+    layer="below"
+)
+
+
+# ------------------------------------------------------------
+# FEAR & GREED LINE
+# ------------------------------------------------------------
+
+fig.add_trace(
+    go.Scatter(
+        x=chart_df.index,
+        y=chart_df["Fear & Greed Score"],
+        mode="lines",
+        name="Fear & Greed",
+        line=dict(
+            color="#FFFFFF",
+            width=2.5
+        ),
+        hovertemplate=(
+            "Date: %{x|%d %b %Y}<br>"
+            "FG Score: %{y:.2f}"
+            "<extra></extra>"
+        )
+    )
+)
+
+
+# ------------------------------------------------------------
+# REFERENCE THRESHOLD LINES
+# ------------------------------------------------------------
+
+for level, label in [
+    (30, "FG 30"),
+    (40, "FG 40"),
+    (60, "FG 60"),
+    (80, "FG 80")
+]:
+
+    fig.add_hline(
+        y=level,
+        line_dash="dash",
+        line_color="#CBD5E1",
+        line_width=1,
+        annotation_text=label,
+        annotation_position="top right",
+        annotation_font_color="#FFFFFF"
+    )
+
+
+# ------------------------------------------------------------
+# CHART LAYOUT
+# ------------------------------------------------------------
+
+fig.update_layout(
+
+    height=480,
+
+    template="plotly_dark",
+
+    paper_bgcolor="#0B1120",
+
+    plot_bgcolor="#151F32",
+
+    margin=dict(
+        l=20,
+        r=35,
+        t=40,
+        b=25
+    ),
+
+    xaxis_title="Date",
+
+    yaxis_title="Fear & Greed Score",
+
+    yaxis=dict(
+        range=[0, 100],
+        tickmode="linear",
+        dtick=10,
+        gridcolor="#263449"
+    ),
+
+    xaxis=dict(
+        gridcolor="#263449"
+    ),
+
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1
+    ),
+
+    hovermode="x unified"
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
+
+
+# ------------------------------------------------------------
+# CHART LEGEND
+# ------------------------------------------------------------
+
+st.markdown(
+    """
+    **Fear & Greed Zones**
+
+    🔴 Below 30 — Extreme Fear / BUY zone
+
+    🟡 30–40 — Fear
+
+    ⚫ 40–60 — Neutral
+
+    🟢 60–80 — Greed
+
+    🟩 Above 80 — Extreme Greed
+    """
 )
 
 st.caption(
-    "Historical Fear & Greed score | BUY threshold: below 30"
+    "Historical Fear & Greed score | "
+    "BUY threshold: below 30"
 )
 
 
