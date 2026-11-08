@@ -112,6 +112,7 @@ def calculate_fg(close_series, vix_series):
 
 # ============================================================
 # DOWNLOAD MARKET DATA
+# AUTOMATIC CACHE EXPIRY: 1 HOUR
 # ============================================================
 
 @st.cache_data(ttl=3600)
@@ -128,7 +129,9 @@ def download_market_data():
     )
 
     if data.empty:
-        raise ValueError("No market data returned by Yahoo Finance.")
+        raise ValueError(
+            "No market data returned by Yahoo Finance."
+        )
 
     def get_close(ticker):
 
@@ -162,6 +165,52 @@ def download_market_data():
 
 
 # ============================================================
+# DASHBOARD HEADER
+# ============================================================
+
+st.title("📊 Market Pulse Screener")
+
+st.caption(
+    "Fear & Greed ETF Monitoring | "
+    "Data powered by Yahoo Finance"
+)
+
+
+# ============================================================
+# MANUAL MARKET DATA REFRESH
+# ============================================================
+
+refresh_col, info_col = st.columns([1, 2])
+
+with refresh_col:
+
+    refresh_clicked = st.button(
+        "🔄 Refresh Market Data",
+        use_container_width=True,
+        type="primary"
+    )
+
+if refresh_clicked:
+
+    with st.spinner("Downloading fresh market data..."):
+
+        # Clear only this function's cached data
+        download_market_data.clear()
+
+        # Rerun the app to download fresh data
+        st.rerun()
+
+with info_col:
+
+    st.caption(
+        "Automatic data cache expiry: 1 hour. "
+        "Use Refresh Market Data to download immediately."
+    )
+
+st.divider()
+
+
+# ============================================================
 # CALCULATE FEAR & GREED SCORES
 # ============================================================
 
@@ -182,6 +231,9 @@ try:
 
     fg_data = fg_data.dropna()
 
+    if fg_data.empty:
+        raise ValueError("No valid Fear & Greed data available.")
+
     latest_fg = fg_data.iloc[-1]
 
     latest_date = fg_data.index[-1]
@@ -198,20 +250,6 @@ except Exception as e:
 
     st.error(f"Unable to retrieve market data: {e}")
     st.stop()
-
-
-# ============================================================
-# DASHBOARD HEADER
-# ============================================================
-
-st.title("📊 Market Pulse Screener")
-
-st.caption(
-    f"Fear & Greed ETF Monitoring | "
-    f"Latest data: {latest_date.strftime('%d %b %Y')}"
-)
-
-st.divider()
 
 
 # ============================================================
@@ -243,6 +281,10 @@ with col3:
         f"< {FG_THRESH}"
     )
 
+st.caption(
+    f"Latest market data date: {latest_date.strftime('%d %b %Y')}"
+)
+
 st.divider()
 
 
@@ -253,7 +295,7 @@ st.divider()
 st.subheader("Market Screener")
 
 
-# Determine status based on FG score
+# Determine signal based on FG score
 
 def get_signal(score):
 
@@ -271,10 +313,12 @@ def get_signal(score):
 
 screener_df = pd.DataFrame({
     "Asset": ASSETS,
+
     "FG Score": [
         f"{float(latest_fg[ticker]):.2f}"
         for ticker in ASSETS
     ],
+
     "Signal": [
         get_signal(float(latest_fg[ticker]))
         for ticker in ASSETS
@@ -282,7 +326,7 @@ screener_df = pd.DataFrame({
 })
 
 
-# Score text colours
+# FG score text colours
 
 def colour_fg(value):
 
