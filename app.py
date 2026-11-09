@@ -147,6 +147,11 @@ div[data-testid="stMetricValue"] {
     color: white !important;
 }
 
+.stButton > button[kind="primary"] *,
+.stButton > button[kind="primary"] p {
+    color: #FFFFFF !important;
+}
+
 .stButton > button[kind="primary"]:hover {
     background: #116477 !important;
     border-color: #116477 !important;
@@ -167,6 +172,22 @@ div[data-testid="stDataFrame"] {
     border-radius: 12px;
     border: 1px solid #E7ECF3;
     overflow: hidden;
+}
+
+/* HISTORICAL BUY SIGNAL TABLE */
+
+div[data-testid="stDataFrame"] thead th,
+div[data-testid="stDataFrame"] thead th *,
+div[data-testid="stDataFrame"] [role="columnheader"],
+div[data-testid="stDataFrame"] [role="columnheader"] * {
+    color: #000000 !important;
+}
+
+/* HISTORICAL BUY SIGNAL NUMBER ALIGNMENT */
+
+div[data-testid="stDataFrame"] [role="gridcell"][aria-colindex="3"] {
+    justify-content: flex-start !important;
+    text-align: left !important;
 }
 
 /* DECISION CARDS */
@@ -765,7 +786,14 @@ if not historical_df.empty:
     st.dataframe(
         historical_df,
         use_container_width=True,
-        hide_index=True
+        hide_index=True,
+        column_config={
+            "Number of Signals": st.column_config.NumberColumn(
+                "Number of Signals",
+                help="Number of ETFs that triggered a BUY signal",
+                format="%d"
+            )
+        }
     )
 
 else:
