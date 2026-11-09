@@ -204,50 +204,8 @@ div[data-testid="stDataFrame"] {
     border-bottom: 1px solid #EDF1F5 !important;
 }
 
-/* ENSURE NUMBER OF SIGNALS IS LEFT-ALIGNED */
-
 .historical-buy-table tbody td:nth-child(3) {
     text-align: left !important;
-}
-
-/* MARKET SCREENER HTML TABLE */
-
-.market-screener-table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-    background-color: #FFFFFF;
-    color: #17243A;
-    font-size: 14px;
-}
-
-/* EQUAL COLUMN WIDTHS */
-
-.market-screener-table col {
-    width: 33.3333%;
-}
-
-/* ALL HEADERS LEFT-ALIGNED */
-
-.market-screener-table thead th {
-    background-color: #EAF0F6 !important;
-    color: #000000 !important;
-    font-weight: 400 !important;
-    text-align: left !important;
-    padding: 13px !important;
-    border: none !important;
-}
-
-/* ALL BODY CELLS LEFT-ALIGNED */
-
-.market-screener-table tbody td {
-    text-align: left !important;
-    padding: 13px !important;
-    border: none !important;
-    border-bottom: 1px solid #EDF1F5 !important;
-    font-size: 14px;
-    vertical-align: middle;
-    box-sizing: border-box;
 }
 
 /* DECISION CARDS */
@@ -608,9 +566,6 @@ screener_df = pd.DataFrame({
 
 # ============================================================
 # FG SCORE COLOURS
-# BUY = GREEN
-# WATCH = GOLD
-# HOLD = RED
 # ============================================================
 
 def colour_fg(value):
@@ -675,7 +630,9 @@ def colour_signal(value):
 
 # ============================================================
 # MARKET SCREENER HTML TABLE
-# EQUAL COLUMN WIDTHS + ALL TEXT LEFT-ALIGNED
+# RENDERED USING st.html()
+# ALL TEXT LEFT-ALIGNED
+# EQUAL COLUMN WIDTHS
 # ============================================================
 
 market_screener_rows = []
@@ -719,29 +676,62 @@ for _, row in screener_df.iterrows():
     )
 
 market_screener_html = f"""
-<table class="market-screener-table">
+<table style="
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    background-color: #FFFFFF;
+    color: #17243A;
+    font-size: 14px;
+">
     <colgroup>
         <col style="width: 33.3333%;">
         <col style="width: 33.3333%;">
         <col style="width: 33.3334%;">
     </colgroup>
+
     <thead>
         <tr>
-            <th>Asset</th>
-            <th>FG Score</th>
-            <th>Signal</th>
+            <th style="
+                width: 33.3333%;
+                background-color: #EAF0F6;
+                color: #000000;
+                font-weight: 400;
+                text-align: left;
+                padding: 13px;
+            ">Asset</th>
+
+            <th style="
+                width: 33.3333%;
+                background-color: #EAF0F6;
+                color: #000000;
+                font-weight: 400;
+                text-align: left;
+                padding: 13px;
+            ">FG Score</th>
+
+            <th style="
+                width: 33.3334%;
+                background-color: #EAF0F6;
+                color: #000000;
+                font-weight: 400;
+                text-align: left;
+                padding: 13px;
+            ">Signal</th>
         </tr>
     </thead>
+
     <tbody>
         {''.join(market_screener_rows)}
     </tbody>
 </table>
 """
 
-st.markdown(
-    market_screener_html,
-    unsafe_allow_html=True
-)
+# IMPORTANT:
+# st.html renders HTML directly.
+# Do not use st.markdown for this table.
+
+st.html(market_screener_html)
 
 st.caption(
     "BUY: FG below 30  |  "
