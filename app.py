@@ -4,1105 +4,845 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+from pathlib import Path
+from datetime import datetime
 
 # ============================================================
-# PAGE CONFIGURATION
+# PAGE CONFIGURATION & CUSTOM HEARTBEAT FAVICON
 # ============================================================
+
+HEARTBEAT_SVG = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
+  <path d="M3 32 H24 L32 32 L40 12 L49 49 L59 23 L66 32 H97"
+        fill="none"
+        stroke="#12A89D"
+        stroke-width="4"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>
+"""
+
+Path("heartbeat.svg").write_text(HEARTBEAT_SVG, encoding="utf-8")
 
 st.set_page_config(
     page_title="Market Pulse | ETF Screener",
-    page_icon="📊",
+    page_icon="heartbeat.svg",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ============================================================
-# COLOUR SETTINGS
+# SETTINGS
 # ============================================================
 
-NAVY = "#14243A"
-NAVY_LIGHT = "#203D5C"
-TEAL = "#167D91"
-GREEN = "#15803D"
-GOLD = "#B77900"
-RED = "#DC2626"
-TEXT = "#17243A"
-GREY = "#718096"
+ASSETS = ["SPY", "QQQ", "VGT", "VTI", "VT"]
+FG_THRESH = 30
+WATCH_THRESH = 40
+
+LOOKBACK_MOMENTUM = 125
+LOOKBACK_NORMALIZATION = 252
 
 # ============================================================
-# DASHBOARD STYLING
+# CUSTOM CSS
 # ============================================================
 
 st.markdown("""
 <style>
+    .stApp {
+        background: #F4F7FA;
+        color: #172B4D;
+    }
 
-/* MAIN APPLICATION */
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+        max-width: 1450px;
+    }
 
-.stApp {
-    background-color: #F4F6FA;
-    color: #17243A;
-}
+    header[data-testid="stHeader"] {
+        background: transparent;
+    }
 
-.block-container {
-    max-width: 1500px;
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
+    .dashboard-header {
+        background: linear-gradient(110deg, #102A43, #164E63);
+        padding: 27px 32px;
+        border-radius: 16px;
+        margin-bottom: 25px;
+        color: white;
+        box-shadow: 0 5px 18px rgba(16, 42, 67, 0.12);
+    }
 
-h1, h2, h3, p, label {
-    color: #17243A;
-}
+    .header-title {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-size: 30px;
+        font-weight: 750;
+        color: white;
+        margin: 0;
+    }
 
-/* HEADER */
+    .header-subtitle {
+        color: #D7E6EE;
+        font-size: 13px;
+        margin-top: 8px;
+        letter-spacing: 0.3px;
+    }
 
-.dashboard-header {
-    background: linear-gradient(115deg, #14243A, #203D5C);
-    padding: 30px 32px;
-    border-radius: 16px;
-    margin-bottom: 24px;
-    box-shadow: 0 5px 18px rgba(20,36,58,0.12);
-}
+    .section-title {
+        color: #172B4D;
+        font-size: 19px;
+        font-weight: 700;
+        margin-top: 18px;
+        margin-bottom: 12px;
+    }
 
-.dashboard-header .header-tag {
-    display: inline-block;
-    background: rgba(45,212,191,0.15);
-    color: #5EEAD4;
-    padding: 6px 13px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    margin-bottom: 12px;
-}
+    .metric-card {
+        background: white;
+        padding: 18px 20px;
+        border-radius: 13px;
+        border: 1px solid #E5EBF0;
+        box-shadow: 0 3px 12px rgba(16, 42, 67, 0.045);
+        min-height: 112px;
+    }
 
-.dashboard-header h1 {
-    color: #FFFFFF !important;
-    font-size: 30px !important;
-    font-weight: 800 !important;
-    margin: 0 0 8px 0 !important;
-    padding: 0 !important;
-}
+    .metric-label {
+        color: #718096;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+    }
 
-.dashboard-header p {
-    color: #B9C9DC !important;
-    font-size: 14px !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
+    .metric-value {
+        color: #172B4D;
+        font-size: 27px;
+        font-weight: 750;
+        margin-top: 8px;
+    }
 
-/* METRIC CARDS */
+    .metric-note {
+        color: #718096;
+        font-size: 12px;
+        margin-top: 3px;
+    }
 
-div[data-testid="stMetric"] {
-    background: #FFFFFF !important;
-    padding: 20px 22px !important;
-    border-radius: 13px !important;
-    border: 1px solid #E7ECF3 !important;
-    box-shadow: 0 3px 12px rgba(25,42,70,0.045);
-}
+    .decision-card {
+        padding: 18px 20px;
+        border-radius: 13px;
+        margin: 10px 0 18px 0;
+        border: 1px solid;
+    }
 
-div[data-testid="stMetric"] label,
-div[data-testid="stMetric"] label *,
-div[data-testid="stMetricValue"],
-div[data-testid="stMetricValue"] *,
-div[data-testid="stMetricDelta"],
-div[data-testid="stMetricDelta"] * {
-    color: #17243A !important;
-}
+    .decision-buy {
+        background: #E8F7EF;
+        border-color: #B8E5CB;
+        color: #147D48;
+    }
 
-div[data-testid="stMetric"] label {
-    font-size: 13px !important;
-    font-weight: 600 !important;
-}
+    .decision-watch {
+        background: #FFF8E6;
+        border-color: #F2DEA2;
+        color: #9A6B00;
+    }
 
-div[data-testid="stMetricValue"] {
-    font-size: 29px !important;
-    font-weight: 800 !important;
-}
+    .decision-hold {
+        background: #FDECEC;
+        border-color: #F4C2C2;
+        color: #C62828;
+    }
 
-/* BUTTONS */
+    .decision-title {
+        font-size: 17px;
+        font-weight: 750;
+        margin-bottom: 4px;
+    }
 
-.stButton > button {
-    border-radius: 9px !important;
-    font-weight: 700 !important;
-    min-height: 42px;
-}
+    .decision-description {
+        font-size: 13px;
+        opacity: 0.9;
+    }
 
-.stButton > button[kind="primary"] {
-    background: #167D91 !important;
-    border: 1px solid #167D91 !important;
-    color: white !important;
-}
+    div.stButton > button {
+        background: #12A89D;
+        color: white;
+        border: none;
+        border-radius: 9px;
+        padding: 8px 20px;
+        font-weight: 650;
+    }
 
-.stButton > button[kind="primary"]:hover {
-    background: #116477 !important;
-    border-color: #116477 !important;
-}
+    div.stButton > button:hover {
+        background: #0D8C83;
+        color: white;
+        border: none;
+    }
 
-/* SELECT BOX */
+    div[data-testid="stDataFrame"] {
+        border: 1px solid #E5EBF0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
 
-div[data-baseweb="select"] > div {
-    background: #FFFFFF;
-    border-radius: 9px;
-    border-color: #DCE3ED;
-}
+    .footer {
+        color: #8492A6;
+        font-size: 11px;
+        text-align: center;
+        margin-top: 35px;
+        padding-top: 15px;
+        border-top: 1px solid #E5EBF0;
+    }
 
-/* DATA TABLE */
+    @media (max-width: 700px) {
+        .header-title {
+            font-size: 23px;
+        }
 
-div[data-testid="stDataFrame"] {
-    background: #FFFFFF;
-    border-radius: 12px;
-    border: 1px solid #E7ECF3;
-    overflow: hidden;
-}
-
-/* DECISION CARDS */
-
-.decision-card {
-    padding: 23px 26px;
-    border-radius: 13px;
-    margin-top: 8px;
-    margin-bottom: 12px;
-}
-
-.decision-buy {
-    background: #ECFDF5;
-    border: 1px solid #A7F3D0;
-    border-left: 5px solid #059669;
-}
-
-.decision-hold {
-    background: #EFF6FF;
-    border: 1px solid #BFDBFE;
-    border-left: 5px solid #3B82F6;
-}
-
-.decision-card h3 {
-    font-size: 18px !important;
-    font-weight: 800 !important;
-    margin: 0 0 12px 0 !important;
-}
-
-.decision-card p {
-    font-size: 14px !important;
-    margin: 5px 0 !important;
-}
-
-.decision-buy h3,
-.decision-buy p {
-    color: #065F46 !important;
-}
-
-.decision-hold h3,
-.decision-hold p {
-    color: #1E40AF !important;
-}
-
-/* DIVIDERS */
-
-hr {
-    border-color: #E2E8F0 !important;
-    margin-top: 1.5rem !important;
-    margin-bottom: 1.5rem !important;
-}
-
-/* CAPTIONS */
-
-[data-testid="stCaptionContainer"] {
-    color: #718096 !important;
-}
-
-/* FOOTER */
-
-.footer-text {
-    color: #8290A3;
-    font-size: 12px;
-    text-align: center;
-    line-height: 1.8;
-}
-
+        .dashboard-header {
+            padding: 20px;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
-
 # ============================================================
-# SCREENER SETTINGS - UNCHANGED
-# ============================================================
-
-ASSETS = ["SPY", "QQQ", "VGT", "VTI", "VT"]
-
-FG_THRESH = 30
-
-
-# ============================================================
-# FEAR & GREED CALCULATION - UNCHANGED
-# ============================================================
-
-def calculate_fg(close_series, vix_series):
-
-    ma125 = close_series.rolling(
-        125,
-        min_periods=1
-    ).mean()
-
-    mom = close_series / ma125
-
-    vix_z = (
-        vix_series - vix_series.mean()
-    ) / vix_series.std()
-
-    def _norm(s):
-
-        lo = s.rolling(
-            252,
-            min_periods=1
-        ).min()
-
-        hi = s.rolling(
-            252,
-            min_periods=1
-        ).max()
-
-        return (
-            (s - lo) /
-            (hi - lo).replace(0, 1)
-        ) * 100
-
-    return (
-        _norm(mom) +
-        _norm(-vix_z)
-    ) / 2
-
-
-# ============================================================
-# DOWNLOAD MARKET DATA
-# AUTOMATIC CACHE EXPIRY: 1 HOUR
-# ============================================================
-
-@st.cache_data(ttl=3600)
-def download_market_data():
-
-    tickers = ASSETS + ["^VIX"]
-
-    data = yf.download(
-        tickers,
-        period="3y",
-        auto_adjust=True,
-        progress=False,
-        group_by="ticker"
-    )
-
-    if data.empty:
-        raise ValueError(
-            "No market data returned by Yahoo Finance."
-        )
-
-    def get_close(ticker):
-
-        if isinstance(data.columns, pd.MultiIndex):
-
-            if ticker in data.columns.get_level_values(0):
-                return data[ticker]["Close"].astype(float)
-
-            if ticker in data.columns.get_level_values(1):
-                return data.xs(
-                    ticker,
-                    axis=1,
-                    level=1
-                )["Close"].astype(float)
-
-        elif "Close" in data.columns:
-            return data["Close"].astype(float)
-
-        raise ValueError(
-            f"Unable to retrieve closing price for {ticker}"
-        )
-
-    close_data = pd.DataFrame({
-        ticker: get_close(ticker)
-        for ticker in ASSETS
-    })
-
-    vix = get_close("^VIX")
-
-    combined = close_data.copy()
-    combined["VIX"] = vix
-
-    return combined.dropna()
-
-
-# ============================================================
-# DASHBOARD HEADER
+# HEADER WITH ECG HEARTBEAT LOGO
 # ============================================================
 
 st.markdown("""
 <div class="dashboard-header">
-    <div class="header-tag">MARKET INTELLIGENCE</div>
-    <h1>📊 Market Pulse</h1>
-    <p>Fear &amp; Greed ETF Monitoring Dashboard | Powered by Yahoo Finance</p>
+    <div class="header-title">
+        <svg width="75" height="48" viewBox="0 0 100 60"
+             xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 32 H24 L32 32 L40 12 L49 49 L59 23 L66 32 H97"
+                  fill="none"
+                  stroke="#22D3C5"
+                  stroke-width="4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"/>
+        </svg>
+        <span>Market Pulse</span>
+    </div>
+    <div class="header-subtitle">
+        MARKET INTELLIGENCE
+        &nbsp; | &nbsp;
+        Fear &amp; Greed ETF Monitoring Dashboard
+        &nbsp; | &nbsp;
+        Powered by Yahoo Finance
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
-
 # ============================================================
-# MANUAL MARKET DATA REFRESH
+# DATA DOWNLOAD
 # ============================================================
 
-refresh_col, info_col = st.columns([1, 3])
+@st.cache_data(ttl=3600, show_spinner=False)
+def download_market_data():
 
-with refresh_col:
+    tickers = ASSETS + ["^VIX"]
 
-    refresh_clicked = st.button(
-        "↻ Refresh Market Data",
-        use_container_width=True,
-        type="primary"
+    raw = yf.download(
+        tickers,
+        period="3y",
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+        group_by="ticker",
+        threads=True
     )
 
-if refresh_clicked:
+    if raw.empty:
+        raise ValueError("Yahoo Finance returned no market data.")
 
-    download_market_data.clear()
-    st.rerun()
+    result = pd.DataFrame(index=raw.index)
 
-with info_col:
+    for ticker in tickers:
 
-    st.caption(
-        "Automatic cache expiry: 1 hour. "
-        "Use Refresh Market Data to download fresh data immediately."
-    )
+        try:
+            if isinstance(raw.columns, pd.MultiIndex):
 
+                if (ticker, "Close") in raw.columns:
+                    series = raw[(ticker, "Close")]
 
-# ============================================================
-# CALCULATE FEAR & GREED SCORES
-# ============================================================
+                elif ("Close", ticker) in raw.columns:
+                    series = raw[("Close", ticker)]
 
-try:
+                else:
+                    continue
 
-    with st.spinner("Loading market intelligence..."):
+            else:
+                if "Close" not in raw.columns:
+                    continue
 
-        market_data = download_market_data()
+                series = raw["Close"]
 
-        vix_series = market_data["VIX"]
+            result[ticker] = series
 
-        fg_data = pd.DataFrame(
-            index=market_data.index
+        except (KeyError, TypeError):
+            continue
+
+    result = result.sort_index()
+    result = result.ffill()
+
+    required = ASSETS + ["^VIX"]
+    missing = [ticker for ticker in required if ticker not in result.columns]
+
+    if missing:
+        raise ValueError(
+            "Unable to retrieve data for: " + ", ".join(missing)
         )
 
-        for ticker in ASSETS:
-
-            fg_data[ticker] = calculate_fg(
-                market_data[ticker],
-                vix_series
-            )
-
-        fg_data = fg_data.dropna()
-
-        if fg_data.empty:
-            raise ValueError(
-                "No valid Fear & Greed data available."
-            )
-
-        latest_fg = fg_data.iloc[-1]
-
-        latest_date = fg_data.index[-1]
-
-        triggered_assets = [
-            ticker
-            for ticker in ASSETS
-            if latest_fg[ticker] < FG_THRESH
-        ]
-
-        buy_count = len(triggered_assets)
-
-except Exception as e:
-
-    st.error(f"Unable to retrieve market data: {e}")
-    st.stop()
+    return result.dropna(subset=required)
 
 
 # ============================================================
-# SIGNAL CLASSIFICATION
+# FEAR & GREED CALCULATION
+# ============================================================
+
+def normalize_rolling(series, window=LOOKBACK_NORMALIZATION):
+
+    rolling_min = series.rolling(
+        window,
+        min_periods=60
+    ).min()
+
+    rolling_max = series.rolling(
+        window,
+        min_periods=60
+    ).max()
+
+    denominator = rolling_max - rolling_min
+
+    normalized = (
+        (series - rolling_min) /
+        denominator.replace(0, np.nan)
+    ) * 100
+
+    return normalized.clip(0, 100)
+
+
+def calculate_fg(data, ticker):
+
+    close = data[ticker]
+    vix = data["^VIX"]
+
+    # ETF momentum relative to its 125-day moving average
+    moving_average = close.rolling(
+        LOOKBACK_MOMENTUM,
+        min_periods=LOOKBACK_MOMENTUM
+    ).mean()
+
+    momentum = (close / moving_average) - 1
+
+    # VIX rolling z-score
+    vix_mean = vix.rolling(
+        LOOKBACK_MOMENTUM,
+        min_periods=LOOKBACK_MOMENTUM
+    ).mean()
+
+    vix_std = vix.rolling(
+        LOOKBACK_MOMENTUM,
+        min_periods=LOOKBACK_MOMENTUM
+    ).std()
+
+    vix_zscore = (vix - vix_mean) / vix_std.replace(0, np.nan)
+
+    # Normalize momentum and inverse VIX z-score
+    momentum_score = normalize_rolling(momentum)
+
+    inverse_vix_score = normalize_rolling(-vix_zscore)
+
+    # Combined Fear & Greed score
+    fg_score = (
+        momentum_score + inverse_vix_score
+    ) / 2
+
+    return fg_score.clip(0, 100)
+
+
+# ============================================================
+# SIGNAL RULES
 # ============================================================
 
 def get_signal(score):
 
-    if score < 30:
+    if pd.isna(score):
+        return "N/A"
+
+    if score < FG_THRESH:
         return "BUY"
 
-    elif score <= 40:
+    elif score <= WATCH_THRESH:
         return "WATCH"
 
     else:
         return "HOLD"
 
 
+def get_signal_colour(signal):
+
+    colours = {
+        "BUY": "#159957",
+        "WATCH": "#B8860B",
+        "HOLD": "#C62828",
+        "N/A": "#718096"
+    }
+
+    return colours.get(signal, "#718096")
+
+
+def get_fg_colour(score):
+
+    if pd.isna(score):
+        return "#718096"
+
+    if score < FG_THRESH:
+        return "#159957"
+
+    elif score <= WATCH_THRESH:
+        return "#B8860B"
+
+    return "#C62828"
+
+
+# ============================================================
+# MANUAL REFRESH
+# ============================================================
+
+refresh_col1, refresh_col2 = st.columns([1, 5])
+
+with refresh_col1:
+    refresh_clicked = st.button(
+        "↻ Refresh Market Data",
+        use_container_width=True
+    )
+
+if refresh_clicked:
+    download_market_data.clear()
+    st.rerun()
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+try:
+    with st.spinner("Retrieving latest market data..."):
+        market_data = download_market_data()
+
+except Exception as error:
+    st.error("Unable to retrieve market data.")
+    st.exception(error)
+    st.stop()
+
+# ============================================================
+# CALCULATE SCORES FOR ALL ETFs
+# ============================================================
+
+scores = pd.DataFrame(index=market_data.index)
+
+for ticker in ASSETS:
+    scores[ticker] = calculate_fg(market_data, ticker)
+
+scores = scores.dropna(how="all")
+
+if scores.empty:
+    st.error("Insufficient historical data to calculate Fear & Greed scores.")
+    st.stop()
+
+latest_date = scores.index[-1]
+
 # ============================================================
 # MARKET OVERVIEW
 # ============================================================
 
-st.subheader("Market Overview")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-
-    st.metric(
-        "Assets Monitored",
-        len(ASSETS)
-    )
-
-with col2:
-
-    st.metric(
-        "BUY Opportunities",
-        buy_count,
-        delta=f"{buy_count} of {len(ASSETS)} ETFs"
-    )
-
-with col3:
-
-    st.metric(
-        "Fear Threshold",
-        f"< {FG_THRESH}"
-    )
-
-st.caption(
-    f"Latest market data: {latest_date.strftime('%A, %d %B %Y')}"
+st.markdown(
+    '<div class="section-title">Market Overview</div>',
+    unsafe_allow_html=True
 )
 
-st.divider()
+overview_rows = []
 
+for ticker in ASSETS:
 
-# ============================================================
-# MARKET SCREENER
-# ============================================================
+    score = scores[ticker].dropna().iloc[-1]
+    signal = get_signal(score)
 
-st.subheader("Market Screener")
+    overview_rows.append({
+        "ETF": ticker,
+        "Fear & Greed Score": round(float(score), 2),
+        "Signal": signal
+    })
 
-st.caption(
-    "ETF Fear & Greed readings and current trading signals."
-)
+overview_df = pd.DataFrame(overview_rows)
 
-screener_df = pd.DataFrame({
+cols = st.columns(len(ASSETS))
 
-    "Asset": ASSETS,
+for col, row in zip(cols, overview_rows):
 
-    "FG Score": [
-        f"{float(latest_fg[ticker]):.2f}"
-        for ticker in ASSETS
-    ],
+    score = row["Fear & Greed Score"]
+    signal = row["Signal"]
 
-    "Signal": [
-        get_signal(float(latest_fg[ticker]))
-        for ticker in ASSETS
-    ]
-
-})
-
-
-# ============================================================
-# FG SCORE COLOURS
-# BUY = GREEN
-# WATCH = GOLD
-# HOLD = RED
-# ============================================================
-
-def colour_fg(value):
-
-    score = float(value)
-
-    if score < 30:
-
-        return (
-            "color: #15803D;"
-            "font-weight: 800;"
-            "background-color: #F0FDF4;"
-        )
-
-    elif score <= 40:
-
-        return (
-            "color: #B77900;"
-            "font-weight: 800;"
-            "background-color: #FFFBEB;"
-        )
-
-    else:
-
-        return (
-            "color: #DC2626;"
-            "font-weight: 800;"
-            "background-color: #FEF2F2;"
-        )
-
-
-# ============================================================
-# SIGNAL COLOURS
-# ============================================================
-
-def colour_signal(value):
-
-    if value == "BUY":
-
-        return (
-            "color: #15803D;"
-            "font-weight: 800;"
-            "background-color: #F0FDF4;"
-        )
-
-    elif value == "WATCH":
-
-        return (
-            "color: #B77900;"
-            "font-weight: 800;"
-            "background-color: #FFFBEB;"
-        )
-
-    else:
-
-        return (
-            "color: #DC2626;"
-            "font-weight: 800;"
-            "background-color: #FEF2F2;"
-        )
-
-
-# ============================================================
-# TABLE STYLING
-# ============================================================
-
-styled_df = (
-
-    screener_df.style
-
-    .set_properties(
-        subset=["Asset"],
-        **{
-            "color": "#17243A",
-            "font-weight": "800",
-            "background-color": "#FFFFFF",
-            "text-align": "left",
-            "padding": "13px"
-        }
-    )
-
-    .set_properties(
-        subset=["FG Score"],
-        **{
-            "text-align": "left",
-            "padding-left": "22px",
-            "padding-top": "13px",
-            "padding-bottom": "13px"
-        }
-    )
-
-    .set_properties(
-        subset=["Signal"],
-        **{
-            "text-align": "center",
-            "padding": "13px"
-        }
-    )
-
-    .set_table_styles([
-
-        {
-            "selector": "th",
-            "props": [
-                ("background-color", "#EAF0F6"),
-                ("color", "#334155"),
-                ("font-weight", "800"),
-                ("text-align", "left"),
-                ("padding", "13px")
-            ]
-        },
-
-        {
-            "selector": "td",
-            "props": [
-                ("border-bottom", "1px solid #EDF1F5"),
-                ("font-size", "14px")
-            ]
-        }
-
-    ])
-
-    .map(
-        colour_fg,
-        subset=["FG Score"]
-    )
-
-    .map(
-        colour_signal,
-        subset=["Signal"]
-    )
-
-)
-
-st.dataframe(
-    styled_df,
-    use_container_width=True,
-    hide_index=True
-)
-
-st.caption(
-    "BUY: FG below 30  |  "
-    "WATCH: FG 30–40  |  "
-    "HOLD: FG above 40"
-)
-
-st.divider()
-
-
-# ============================================================
-# TRADING DECISION
-# ============================================================
-
-st.subheader("Trading Decision")
-
-if triggered_assets:
-
-    buy_text = ", ".join(triggered_assets)
-
-    st.markdown(
-        f"""
-        <div class="decision-card decision-buy">
-            <h3>⚡ ACTION REQUIRED TOMORROW</h3>
-            <p><b>BUY OPPORTUNITIES:</b> {buy_text}</p>
-            <p><b>Execution:</b> Next Trading Day Open</p>
-            <p><b>Number of triggered ETFs:</b> {buy_count}</p>
+    with col:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">{row["ETF"]}</div>
+            <div class="metric-value"
+                 style="color:{get_fg_colour(score)}">
+                {score:.2f}
+            </div>
+            <div style="
+                color:{get_signal_colour(signal)};
+                font-size:13px;
+                font-weight:750;
+                margin-top:5px;">
+                {signal}
+            </div>
         </div>
-        """,
-        unsafe_allow_html=True
+        """, unsafe_allow_html=True)
+
+# ============================================================
+# CURRENT MARKET SIGNAL
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">Market Screener</div>',
+    unsafe_allow_html=True
+)
+
+buy_count = sum(
+    1 for row in overview_rows if row["Signal"] == "BUY"
+)
+
+watch_count = sum(
+    1 for row in overview_rows if row["Signal"] == "WATCH"
+)
+
+hold_count = sum(
+    1 for row in overview_rows if row["Signal"] == "HOLD"
+)
+
+m1, m2, m3, m4 = st.columns(4)
+
+with m1:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">BUY Signals</div>
+        <div class="metric-value" style="color:#159957">
+            {buy_count}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with m2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">WATCH Signals</div>
+        <div class="metric-value" style="color:#B8860B">
+            {watch_count}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with m3:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">HOLD Signals</div>
+        <div class="metric-value" style="color:#C62828">
+            {hold_count}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with m4:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Last Data Date</div>
+        <div class="metric-value" style="font-size:20px">
+            {latest_date.strftime("%d %b %Y")}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ============================================================
+# BUY / NO BUY DECISION
+# ============================================================
+
+if buy_count > 0:
+
+    decision_class = "decision-buy"
+    decision_title = "BUY SIGNAL DETECTED"
+    decision_description = (
+        f"{buy_count} ETF(s) currently have a Fear & Greed "
+        "score below 30."
+    )
+
+elif watch_count > 0:
+
+    decision_class = "decision-watch"
+    decision_title = "WATCH MARKET"
+    decision_description = (
+        "No BUY signal is currently available. "
+        "Some ETFs are approaching the BUY threshold."
     )
 
 else:
 
-    st.markdown(
-        """
-        <div class="decision-card decision-hold">
-            <h3>NO BUY SIGNAL</h3>
-            <p>
-                No monitored ETF currently meets the
-                Fear &amp; Greed BUY threshold.
-            </p>
-            <p>Continue monitoring the market.</p>
-        </div>
-        """,
-        unsafe_allow_html=True
+    decision_class = "decision-hold"
+    decision_title = "NO BUY SIGNAL"
+    decision_description = (
+        "All ETFs are currently above the BUY threshold. "
+        "Continue monitoring the market."
     )
 
-st.divider()
+st.markdown(f"""
+<div class="decision-card {decision_class}">
+    <div class="decision-title">{decision_title}</div>
+    <div class="decision-description">{decision_description}</div>
+</div>
+""", unsafe_allow_html=True)
 
+# ============================================================
+# ETF SELECTOR AND FEAR & GREED CHART
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">ETF Fear & Greed Analysis</div>',
+    unsafe_allow_html=True
+)
+
+selected_etf = st.selectbox(
+    "Select ETF",
+    ASSETS,
+    index=0
+)
+
+selected_scores = scores[selected_etf].dropna()
+current_score = float(selected_scores.iloc[-1])
+current_signal = get_signal(current_score)
+
+chart_col1, chart_col2 = st.columns([3, 1])
+
+with chart_col1:
+
+    st.markdown("**Fear & Greed Trend**")
+
+    fig = go.Figure()
+
+    # Fear zone
+    fig.add_hrect(
+        y0=0, y1=30,
+        fillcolor="rgba(220, 70, 70, 0.10)",
+        line_width=0
+    )
+
+    # Watch zone
+    fig.add_hrect(
+        y0=30, y1=40,
+        fillcolor="rgba(230, 180, 50, 0.12)",
+        line_width=0
+    )
+
+    # Neutral zone
+    fig.add_hrect(
+        y0=40, y1=60,
+        fillcolor="rgba(160, 170, 180, 0.08)",
+        line_width=0
+    )
+
+    # Greed zone
+    fig.add_hrect(
+        y0=60, y1=80,
+        fillcolor="rgba(60, 170, 120, 0.08)",
+        line_width=0
+    )
+
+    # Extreme greed zone
+    fig.add_hrect(
+        y0=80, y1=100,
+        fillcolor="rgba(30, 140, 100, 0.12)",
+        line_width=0
+    )
+
+    fig.add_trace(go.Scatter(
+        x=selected_scores.index,
+        y=selected_scores.values,
+        mode="lines",
+        name=selected_etf,
+        line=dict(
+            color="#12A89D",
+            width=2.5
+        ),
+        hovertemplate=(
+            "%{x|%d %b %Y}<br>"
+            "FG Score: %{y:.2f}"
+            "<extra></extra>"
+        )
+    ))
+
+    # Threshold lines
+    for threshold, label in [
+        (30, "BUY Threshold"),
+        (40, "WATCH Threshold"),
+        (60, "Greed"),
+        (80, "Extreme Greed")
+    ]:
+
+        fig.add_hline(
+            y=threshold,
+            line_dash="dash",
+            line_color="#8492A6",
+            line_width=1,
+            annotation_text=label,
+            annotation_position="top left"
+        )
+
+    fig.update_layout(
+        height=430,
+        margin=dict(l=10, r=20, t=35, b=10),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(
+            family="Arial",
+            color="#172B4D"
+        ),
+        yaxis=dict(
+            title="Fear & Greed Score",
+            range=[0, 100],
+            gridcolor="#E9EEF3",
+            dtick=20
+        ),
+        xaxis=dict(
+            title="",
+            gridcolor="#F0F3F6",
+            rangeselector=dict(
+                buttons=[
+                    dict(count=1, label="1M", step="month", stepmode="backward"),
+                    dict(count=3, label="3M", step="month", stepmode="backward"),
+                    dict(count=6, label="6M", step="month", stepmode="backward"),
+                    dict(count=1, label="1Y", step="year", stepmode="backward"),
+                    dict(step="all", label="ALL")
+                ],
+                bgcolor="#F4F7FA",
+                activecolor="#D7F3EF"
+            ),
+            rangeslider=dict(visible=False)
+        ),
+        showlegend=False
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+with chart_col2:
+
+    st.markdown("**Current Reading**")
+
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">{selected_etf} FG Score</div>
+        <div class="metric-value"
+             style="color:{get_fg_colour(current_score)}">
+            {current_score:.2f}
+        </div>
+        <div style="
+            color:{get_signal_colour(current_signal)};
+            font-size:16px;
+            font-weight:750;
+            margin-top:8px;">
+            {current_signal}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("")
+
+    if current_signal == "BUY":
+        st.success("ETF has reached the BUY zone.")
+
+    elif current_signal == "WATCH":
+        st.warning("ETF is approaching the BUY zone.")
+
+    else:
+        st.error("ETF is currently in the HOLD zone.")
 
 # ============================================================
 # HISTORICAL BUY SIGNALS
 # ============================================================
 
-st.subheader("Historical BUY Signals")
-
-st.caption(
-    "Most recent historical dates when at least one ETF "
-    "reached the BUY threshold."
+st.markdown(
+    '<div class="section-title">Historical BUY Signals</div>',
+    unsafe_allow_html=True
 )
 
-historical_signals = []
+history_rows = []
 
-for date, row in fg_data.iterrows():
+for ticker in ASSETS:
 
-    triggered = [
-        ticker
-        for ticker in ASSETS
-        if row[ticker] < FG_THRESH
-    ]
+    ticker_scores = scores[ticker].dropna()
 
-    if triggered:
+    for date, score in ticker_scores.items():
 
-        historical_signals.append({
+        if score < FG_THRESH:
 
-            "Date": date.strftime("%d %b %Y"),
+            history_rows.append({
+                "Date": date,
+                "ETF": ticker,
+                "Fear & Greed Score": round(float(score), 2),
+                "Signal": "BUY"
+            })
 
-            "Triggered Assets": ", ".join(triggered),
+if history_rows:
 
-            "Number of Signals": len(triggered)
+    history_df = pd.DataFrame(history_rows)
 
-        })
+    history_df = history_df.sort_values(
+        "Date",
+        ascending=False
+    ).head(10)
 
-
-historical_df = pd.DataFrame(historical_signals)
-
-if not historical_df.empty:
-
-    historical_df = historical_df.tail(10)
-
-    historical_df = historical_df.iloc[::-1]
+    history_df["Date"] = history_df["Date"].dt.strftime("%d %b %Y")
 
     st.dataframe(
-        historical_df,
+        history_df,
         use_container_width=True,
         hide_index=True
     )
 
 else:
 
-    st.info("No historical BUY signals found.")
-
-st.divider()
-
+    st.info("No historical BUY signals found in the available data.")
 
 # ============================================================
-# FEAR & GREED TREND
+# DATA TABLE
 # ============================================================
 
-st.subheader("Fear & Greed Trend")
-
-st.caption(
-    "Select an ETF to view its individual Fear & Greed trend."
+st.markdown(
+    '<div class="section-title">ETF Screener Details</div>',
+    unsafe_allow_html=True
 )
 
-selected_asset = st.selectbox(
-    "Select ETF",
-    options=ASSETS,
-    index=0,
-    key="fg_selected_asset"
-)
+display_df = overview_df.copy()
 
+display_df["Fear & Greed Score"] = display_df[
+    "Fear & Greed Score"
+].map(lambda x: f"{x:.2f}")
 
-# ============================================================
-# ETF COLOURS
-# ============================================================
-
-line_colours = {
-
-    "SPY": "#2563EB",
-    "QQQ": "#7C3AED",
-    "VGT": "#0891B2",
-    "VTI": "#D97706",
-    "VT": "#DB2777"
-
-}
-
-selected_colour = line_colours[selected_asset]
-
-selected_fg = fg_data[selected_asset]
-
-
-# ============================================================
-# CURRENT ETF SCORE
-# ============================================================
-
-current_score = float(latest_fg[selected_asset])
-
-current_signal = get_signal(current_score)
-
-score_col, signal_col = st.columns(2)
-
-with score_col:
-
-    st.metric(
-        f"{selected_asset} Current FG Score",
-        f"{current_score:.2f}"
-    )
-
-with signal_col:
-
-    st.metric(
-        "Current Signal",
-        current_signal
-    )
-
-
-# ============================================================
-# CREATE FEAR & GREED CHART
-# ============================================================
-
-fig = go.Figure()
-
-
-# Background zones
-
-zones = [
-
-    (0, 30, "rgba(239,68,68,0.10)"),
-    (30, 40, "rgba(245,158,11,0.12)"),
-    (40, 60, "rgba(148,163,184,0.09)"),
-    (60, 80, "rgba(16,185,129,0.08)"),
-    (80, 100, "rgba(34,197,94,0.11)")
-
-]
-
-for y0, y1, fill in zones:
-
-    fig.add_hrect(
-        y0=y0,
-        y1=y1,
-        fillcolor=fill,
-        line_width=0,
-        layer="below"
-    )
-
-
-# ETF trend line
-
-fig.add_trace(
-
-    go.Scatter(
-
-        x=selected_fg.index,
-
-        y=selected_fg.values,
-
-        mode="lines",
-
-        name=selected_asset,
-
-        line=dict(
-            color=selected_colour,
-            width=2.8,
-            shape="linear"
-        ),
-
-        hovertemplate=(
-            "<b>" + selected_asset + "</b><br>"
-            "Date: %{x|%d %b %Y}<br>"
-            "FG Score: %{y:.2f}"
-            "<extra></extra>"
-        )
-
-    )
-
-)
-
-
-# Threshold reference lines
-
-thresholds = [
-
-    (30, "#DC2626", "BUY Threshold"),
-    (40, "#D97706", "Fear"),
-    (60, "#64748B", "Neutral"),
-    (80, "#16A34A", "Greed")
-
-]
-
-for value, colour, label in thresholds:
-
-    fig.add_hline(
-
-        y=value,
-
-        line_dash="dot",
-
-        line_color=colour,
-
-        line_width=1.2,
-
-        annotation_text=label,
-
-        annotation_position="right",
-
-        annotation_font_color=colour,
-
-        annotation_font_size=10
-
-    )
-
-
-# Chart layout
-
-fig.update_layout(
-
-    template="plotly_white",
-
-    height=500,
-
-    paper_bgcolor="#FFFFFF",
-
-    plot_bgcolor="#FFFFFF",
-
-    font=dict(
-        family="Arial, sans-serif",
-        color="#334155",
-        size=12
-    ),
-
-    title=dict(
-        text=f"{selected_asset} Fear & Greed Index",
-        font=dict(
-            size=19,
-            color="#17243A"
-        ),
-        x=0.02,
-        xanchor="left"
-    ),
-
-    hovermode="x unified",
-
-    showlegend=False,
-
-    margin=dict(
-        l=50,
-        r=90,
-        t=100,
-        b=50
-    ),
-
-    dragmode=False,
-
-    xaxis=dict(
-
-        title="Date",
-
-        showgrid=True,
-
-        gridcolor="#EDF1F5",
-
-        gridwidth=1,
-
-        zeroline=False,
-
-        showline=True,
-
-        linecolor="#DCE3ED",
-
-        tickfont=dict(color="#64748B"),
-
-        fixedrange=True,
-
-        rangeselector=dict(
-
-            buttons=[
-
-                dict(
-                    count=1,
-                    label="1M",
-                    step="month",
-                    stepmode="backward"
-                ),
-
-                dict(
-                    count=3,
-                    label="3M",
-                    step="month",
-                    stepmode="backward"
-                ),
-
-                dict(
-                    count=6,
-                    label="6M",
-                    step="month",
-                    stepmode="backward"
-                ),
-
-                dict(
-                    count=1,
-                    label="1Y",
-                    step="year",
-                    stepmode="backward"
-                ),
-
-                dict(
-                    step="all",
-                    label="ALL"
-                )
-
-            ],
-
-            bgcolor="#F1F5F9",
-
-            activecolor="#C7DDF4",
-
-            bordercolor="#DCE3ED",
-
-            borderwidth=1,
-
-            font=dict(
-                color="#334155",
-                size=11
-            ),
-
-            x=1,
-
-            xanchor="right",
-
-            y=1.15
-
-        )
-
-    ),
-
-    yaxis=dict(
-
-        title="Fear & Greed Score",
-
-        range=[0, 100],
-
-        tickmode="linear",
-
-        tick0=0,
-
-        dtick=10,
-
-        showgrid=True,
-
-        gridcolor="#EDF1F5",
-
-        gridwidth=1,
-
-        zeroline=False,
-
-        showline=True,
-
-        linecolor="#DCE3ED",
-
-        tickfont=dict(color="#64748B"),
-
-        fixedrange=True
-
-    )
-
-)
-
-
-# ============================================================
-# DISPLAY CHART
-# ============================================================
-
-st.plotly_chart(
-
-    fig,
-
+st.dataframe(
+    display_df,
     use_container_width=True,
-
-    config={
-
-        "scrollZoom": False,
-
-        "displayModeBar": False,
-
-        "staticPlot": False,
-
-        "doubleClick": False,
-
-        "responsive": True
-
-    }
-
+    hide_index=True
 )
-
 
 # ============================================================
 # FOOTER
 # ============================================================
 
-st.divider()
-
-st.markdown(
-    """
-    <div class="footer-text">
-        <b>MARKET PULSE SCREENER</b><br>
-        Market intelligence powered by Yahoo Finance.<br>
-        Signals are based on historical price and volatility
-        data and are for informational purposes only.
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown(f"""
+<div class="footer">
+    Market Pulse | ETF Fear &amp; Greed Screener<br>
+    Data source: Yahoo Finance
+    &nbsp; | &nbsp;
+    Last retrieved: {datetime.now().strftime("%d %b %Y, %H:%M:%S")}<br>
+    For informational and research purposes only. Not financial advice.
+</div>
+""", unsafe_allow_html=True)
