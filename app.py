@@ -144,7 +144,7 @@ div[data-testid="stMetricValue"] {
 .stButton > button[kind="primary"] {
     background: #167D91 !important;
     border: 1px solid #167D91 !important;
-    color: #FFFFFF !important;
+    color: white !important;
 }
 
 .stButton > button[kind="primary"] *,
@@ -767,47 +767,53 @@ if not historical_df.empty:
 
     historical_df = historical_df.iloc[::-1]
 
-    # Apply formatting directly to the historical table.
-    # Third column numbers are explicitly left-aligned.
-    # All three column headers are explicitly black.
+    # Match the Market Screener table's visual styling.
+    # Only the historical table header text is changed to black.
+    # Header text is normal weight, not bold.
+    # Number of Signals values are left-aligned.
 
     historical_styled_df = (
 
         historical_df.style
 
         .set_properties(
+            subset=["Date", "Triggered Assets"],
+            **{
+                "color": "#17243A",
+                "background-color": "#FFFFFF",
+                "text-align": "left",
+                "padding": "13px"
+            }
+        )
+
+        .set_properties(
             subset=["Number of Signals"],
             **{
+                "color": "#17243A",
+                "background-color": "#FFFFFF",
                 "text-align": "left",
-                "padding-left": "12px",
-                "padding-top": "10px",
-                "padding-bottom": "10px"
+                "padding": "13px"
             }
         )
 
         .set_table_styles([
 
             {
-                "selector": "th.col_heading",
+                "selector": "th",
                 "props": [
+                    ("background-color", "#EAF0F6"),
                     ("color", "#000000"),
-                    ("font-weight", "800"),
-                    ("text-align", "left")
+                    ("font-weight", "normal"),
+                    ("text-align", "left"),
+                    ("padding", "13px")
                 ]
             },
 
             {
-                "selector": "th.col_heading.level0",
+                "selector": "td",
                 "props": [
-                    ("color", "#000000 !important")
-                ]
-            },
-
-            {
-                "selector": "td.col2",
-                "props": [
-                    ("text-align", "left !important"),
-                    ("padding-left", "12px")
+                    ("border-bottom", "1px solid #EDF1F5"),
+                    ("font-size", "14px")
                 ]
             }
 
@@ -815,7 +821,11 @@ if not historical_df.empty:
 
     )
 
-    st.table(historical_styled_df)
+    st.dataframe(
+        historical_styled_df,
+        use_container_width=True,
+        hide_index=True
+    )
 
 else:
 
