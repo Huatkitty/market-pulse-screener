@@ -665,7 +665,12 @@ def colour_signal(value):
 # SAME STYLE AS HISTORICAL BUY SIGNALS
 # ============================================================
 
-market_table_rows = []
+market_screener_html = screener_df.to_html(
+    index=False,
+    escape=True,
+    classes="market-screener-table",
+    border=0
+)
 
 for _, row in screener_df.iterrows():
 
@@ -676,49 +681,20 @@ for _, row in screener_df.iterrows():
     fg_style = colour_fg(row["FG Score"])
     signal_style = colour_signal(row["Signal"])
 
-    market_table_rows.append(
-        f"""
-        <tr>
-            <td style="
-                color: #17243A;
-                font-weight: 800;
-                background-color: #FFFFFF;
-                text-align: left;
-                padding: 13px;
-                border-bottom: 1px solid #EDF1F5;
-            ">{asset}</td>
-
-            <td style="
-                {fg_style}
-                text-align: left;
-                padding: 13px 13px 13px 22px;
-                border-bottom: 1px solid #EDF1F5;
-            ">{fg_score}</td>
-
-            <td style="
-                {signal_style}
-                text-align: center;
-                padding: 13px;
-                border-bottom: 1px solid #EDF1F5;
-            ">{signal}</td>
-        </tr>
-        """
+    market_screener_html = market_screener_html.replace(
+        f"<td>{asset}</td>",
+        f'<td style="color:#17243A;font-weight:800;background-color:#FFFFFF;text-align:left;padding:13px;border-bottom:1px solid #EDF1F5;">{asset}</td>'
     )
 
-market_screener_html = f"""
-<table class="market-screener-table">
-    <thead>
-        <tr>
-            <th>Asset</th>
-            <th>FG Score</th>
-            <th>Signal</th>
-        </tr>
-    </thead>
-    <tbody>
-        {''.join(market_table_rows)}
-    </tbody>
-</table>
-"""
+    market_screener_html = market_screener_html.replace(
+        f"<td>{fg_score}</td>",
+        f'<td style="{fg_style}text-align:left;padding:13px 13px 13px 22px;border-bottom:1px solid #EDF1F5;">{fg_score}</td>'
+    )
+
+    market_screener_html = market_screener_html.replace(
+        f"<td>{signal}</td>",
+        f'<td style="{signal_style}text-align:center;padding:13px;border-bottom:1px solid #EDF1F5;">{signal}</td>'
+    )
 
 st.markdown(
     market_screener_html,
