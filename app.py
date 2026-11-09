@@ -336,7 +336,7 @@ def colour_fg(value):
         return "color: #15803D; font-weight: bold"
 
     elif score <= 40:
-        return "color: #FFD300 ; font-weight: bold"
+        return "color: #FFBF00 ; font-weight: bold"
 
     else:
         return "color: #DC2626; font-weight: bold"
@@ -350,7 +350,7 @@ def colour_signal(value):
         return "color: #15803D; font-weight: bold"
 
     elif value == "WATCH":
-        return "color: #FFD300; font-weight: bold"
+        return "color: #FFBF00; font-weight: bold"
 
     else:
         return "color: #DC2626; font-weight: bold"
