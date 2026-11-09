@@ -214,11 +214,20 @@ div[data-testid="stDataFrame"] {
 
 .market-screener-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     background-color: #FFFFFF;
     color: #17243A;
     font-size: 14px;
 }
+
+/* EQUAL COLUMN WIDTHS */
+
+.market-screener-table col {
+    width: 33.3333%;
+}
+
+/* ALL HEADERS LEFT-ALIGNED */
 
 .market-screener-table thead th {
     background-color: #EAF0F6 !important;
@@ -229,18 +238,16 @@ div[data-testid="stDataFrame"] {
     border: none !important;
 }
 
-/* ALIGN SIGNAL HEADER WITH BUY/WATCH/HOLD VALUES */
-
-.market-screener-table thead th:nth-child(3) {
-    text-align: center !important;
-}
+/* ALL BODY CELLS LEFT-ALIGNED */
 
 .market-screener-table tbody td {
+    text-align: left !important;
+    padding: 13px !important;
     border: none !important;
     border-bottom: 1px solid #EDF1F5 !important;
-    padding: 13px !important;
     font-size: 14px;
     vertical-align: middle;
+    box-sizing: border-box;
 }
 
 /* DECISION CARDS */
@@ -668,14 +675,10 @@ def colour_signal(value):
 
 # ============================================================
 # MARKET SCREENER HTML TABLE
+# EQUAL COLUMN WIDTHS + ALL TEXT LEFT-ALIGNED
 # ============================================================
 
-market_screener_html = screener_df.to_html(
-    index=False,
-    escape=True,
-    classes="market-screener-table",
-    border=0
-)
+market_screener_rows = []
 
 for _, row in screener_df.iterrows():
 
@@ -686,20 +689,54 @@ for _, row in screener_df.iterrows():
     fg_style = colour_fg(row["FG Score"])
     signal_style = colour_signal(row["Signal"])
 
-    market_screener_html = market_screener_html.replace(
-        f"<td>{asset}</td>",
-        f'<td style="color:#17243A;font-weight:800;background-color:#FFFFFF;text-align:left;padding:13px;border-bottom:1px solid #EDF1F5;">{asset}</td>'
+    market_screener_rows.append(
+        f"""
+        <tr>
+            <td style="
+                color: #17243A;
+                font-weight: 800;
+                background-color: #FFFFFF;
+                text-align: left;
+                padding: 13px;
+                border-bottom: 1px solid #EDF1F5;
+            ">{asset}</td>
+
+            <td style="
+                {fg_style}
+                text-align: left;
+                padding: 13px;
+                border-bottom: 1px solid #EDF1F5;
+            ">{fg_score}</td>
+
+            <td style="
+                {signal_style}
+                text-align: left;
+                padding: 13px;
+                border-bottom: 1px solid #EDF1F5;
+            ">{signal}</td>
+        </tr>
+        """
     )
 
-    market_screener_html = market_screener_html.replace(
-        f"<td>{fg_score}</td>",
-        f'<td style="{fg_style}text-align:left;padding:13px 13px 13px 22px;border-bottom:1px solid #EDF1F5;">{fg_score}</td>'
-    )
-
-    market_screener_html = market_screener_html.replace(
-        f"<td>{signal}</td>",
-        f'<td style="{signal_style}text-align:center;padding:13px;border-bottom:1px solid #EDF1F5;">{signal}</td>'
-    )
+market_screener_html = f"""
+<table class="market-screener-table">
+    <colgroup>
+        <col style="width: 33.3333%;">
+        <col style="width: 33.3333%;">
+        <col style="width: 33.3334%;">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>Asset</th>
+            <th>FG Score</th>
+            <th>Signal</th>
+        </tr>
+    </thead>
+    <tbody>
+        {''.join(market_screener_rows)}
+    </tbody>
+</table>
+"""
 
 st.markdown(
     market_screener_html,
