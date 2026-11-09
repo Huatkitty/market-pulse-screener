@@ -336,7 +336,7 @@ def colour_fg(value):
         return "color: #15803D; font-weight: bold"
 
     elif score <= 40:
-        return "color: #B8860B; font-weight: bold"
+        return "color: #FFD500; font-weight: bold"
 
     else:
         return "color: #111827; font-weight: bold"
