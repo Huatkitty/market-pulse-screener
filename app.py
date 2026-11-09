@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from pathlib import Path
+import html
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -207,6 +208,33 @@ div[data-testid="stDataFrame"] {
 
 .historical-buy-table tbody td:nth-child(3) {
     text-align: left !important;
+}
+
+/* MARKET SCREENER HTML TABLE */
+
+.market-screener-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #FFFFFF;
+    color: #17243A;
+    font-size: 14px;
+}
+
+.market-screener-table thead th {
+    background-color: #EAF0F6 !important;
+    color: #000000 !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+    padding: 13px !important;
+    border: none !important;
+}
+
+.market-screener-table tbody td {
+    border: none !important;
+    border-bottom: 1px solid #EDF1F5 !important;
+    padding: 13px !important;
+    font-size: 14px;
+    vertical-align: middle;
 }
 
 /* DECISION CARDS */
@@ -633,81 +661,68 @@ def colour_signal(value):
 
 
 # ============================================================
-# TABLE STYLING
+# MARKET SCREENER HTML TABLE
+# SAME STYLE AS HISTORICAL BUY SIGNALS
 # ============================================================
 
-styled_df = (
+market_table_rows = []
 
-    screener_df.style
+for _, row in screener_df.iterrows():
 
-    .set_properties(
-        subset=["Asset"],
-        **{
-            "color": "#17243A",
-            "font-weight": "800",
-            "background-color": "#FFFFFF",
-            "text-align": "left",
-            "padding": "13px"
-        }
+    asset = html.escape(str(row["Asset"]))
+    fg_score = html.escape(str(row["FG Score"]))
+    signal = html.escape(str(row["Signal"]))
+
+    fg_style = colour_fg(row["FG Score"])
+    signal_style = colour_signal(row["Signal"])
+
+    market_table_rows.append(
+        f"""
+        <tr>
+            <td style="
+                color: #17243A;
+                font-weight: 800;
+                background-color: #FFFFFF;
+                text-align: left;
+                padding: 13px;
+                border-bottom: 1px solid #EDF1F5;
+            ">{asset}</td>
+
+            <td style="
+                {fg_style}
+                text-align: left;
+                padding: 13px 13px 13px 22px;
+                border-bottom: 1px solid #EDF1F5;
+            ">{fg_score}</td>
+
+            <td style="
+                {signal_style}
+                text-align: center;
+                padding: 13px;
+                border-bottom: 1px solid #EDF1F5;
+            ">{signal}</td>
+        </tr>
+        """
     )
 
-    .set_properties(
-        subset=["FG Score"],
-        **{
-            "text-align": "left",
-            "padding-left": "22px",
-            "padding-top": "13px",
-            "padding-bottom": "13px"
-        }
-    )
+market_screener_html = f"""
+<table class="market-screener-table">
+    <thead>
+        <tr>
+            <th>Asset</th>
+            <th>FG Score</th>
+            <th>Signal</th>
+        </tr>
+    </thead>
+    <tbody>
+        {''.join(market_table_rows)}
+    </tbody>
+</table>
+"""
 
-    .set_properties(
-        subset=["Signal"],
-        **{
-            "text-align": "center",
-            "padding": "13px"
-        }
-    )
-
-    .set_table_styles([
-
-        {
-            "selector": "th",
-            "props": [
-                ("background-color", "#EAF0F6"),
-                ("color", "#334155"),
-                ("font-weight", "800"),
-                ("text-align", "left"),
-                ("padding", "13px")
-            ]
-        },
-
-        {
-            "selector": "td",
-            "props": [
-                ("border-bottom", "1px solid #EDF1F5"),
-                ("font-size", "14px")
-            ]
-        }
-
-    ])
-
-    .map(
-        colour_fg,
-        subset=["FG Score"]
-    )
-
-    .map(
-        colour_signal,
-        subset=["Signal"]
-    )
-
-)
-
-st.dataframe(
-    styled_df,
-    use_container_width=True,
-    hide_index=True
+st.markdown(
+    market_screener_html,
+    unsafe_allow_html=True
 )
 
 st.caption(
@@ -801,9 +816,6 @@ if not historical_df.empty:
     historical_df = historical_df.tail(10)
 
     historical_df = historical_df.iloc[::-1]
-
-    # Render as HTML so the header colour and cell alignment
-    # are controlled directly and consistently.
 
     historical_html = historical_df.to_html(
         index=False,
