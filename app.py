@@ -144,7 +144,7 @@ div[data-testid="stMetricValue"] {
 .stButton > button[kind="primary"] {
     background: #167D91 !important;
     border: 1px solid #167D91 !important;
-    color: white !important;
+    color: #FFFFFF !important;
 }
 
 .stButton > button[kind="primary"] *,
@@ -172,22 +172,6 @@ div[data-testid="stDataFrame"] {
     border-radius: 12px;
     border: 1px solid #E7ECF3;
     overflow: hidden;
-}
-
-/* HISTORICAL BUY SIGNAL TABLE */
-
-div[data-testid="stDataFrame"] thead th,
-div[data-testid="stDataFrame"] thead th *,
-div[data-testid="stDataFrame"] [role="columnheader"],
-div[data-testid="stDataFrame"] [role="columnheader"] * {
-    color: #000000 !important;
-}
-
-/* HISTORICAL BUY SIGNAL NUMBER ALIGNMENT */
-
-div[data-testid="stDataFrame"] [role="gridcell"][aria-colindex="3"] {
-    justify-content: flex-start !important;
-    text-align: left !important;
 }
 
 /* DECISION CARDS */
@@ -783,18 +767,55 @@ if not historical_df.empty:
 
     historical_df = historical_df.iloc[::-1]
 
-    st.dataframe(
-        historical_df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Number of Signals": st.column_config.NumberColumn(
-                "Number of Signals",
-                help="Number of ETFs that triggered a BUY signal",
-                format="%d"
-            )
-        }
+    # Apply formatting directly to the historical table.
+    # Third column numbers are explicitly left-aligned.
+    # All three column headers are explicitly black.
+
+    historical_styled_df = (
+
+        historical_df.style
+
+        .set_properties(
+            subset=["Number of Signals"],
+            **{
+                "text-align": "left",
+                "padding-left": "12px",
+                "padding-top": "10px",
+                "padding-bottom": "10px"
+            }
+        )
+
+        .set_table_styles([
+
+            {
+                "selector": "th.col_heading",
+                "props": [
+                    ("color", "#000000"),
+                    ("font-weight", "800"),
+                    ("text-align", "left")
+                ]
+            },
+
+            {
+                "selector": "th.col_heading.level0",
+                "props": [
+                    ("color", "#000000 !important")
+                ]
+            },
+
+            {
+                "selector": "td.col2",
+                "props": [
+                    ("text-align", "left !important"),
+                    ("padding-left", "12px")
+                ]
+            }
+
+        ])
+
     )
+
+    st.table(historical_styled_df)
 
 else:
 
