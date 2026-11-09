@@ -336,10 +336,10 @@ def colour_fg(value):
         return "color: #15803D; font-weight: bold"
 
     elif score <= 40:
-        return "color: #0B6285 ; font-weight: bold"
+        return "color: #FF2C2C ; font-weight: bold"
 
     else:
-        return "color: #FF2C2C; font-weight: bold"
+        return "color: #0B6285; font-weight: bold"
 
 
 # Signal text colours
@@ -350,10 +350,10 @@ def colour_signal(value):
         return "color: #15803D; font-weight: bold"
 
     elif value == "WATCH":
-        return "color: #0B6285; font-weight: bold"
+        return "color: #FF2C2C; font-weight: bold"
 
     else:
-        return "color: #FF2C2C; font-weight: bold"
+        return "color: #0B6285; font-weight: bold"
 
 
 # Table styling
