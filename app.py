@@ -4,14 +4,28 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+from pathlib import Path
 
 # ============================================================
 # PAGE CONFIGURATION
 # ============================================================
 
+HEARTBEAT_SVG = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
+    <path d="M3 32 H24 L32 32 L40 12 L49 49 L59 23 L66 32 H97"
+          fill="none"
+          stroke="#5EEAD4"
+          stroke-width="5"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+</svg>
+"""
+
+Path("heartbeat.svg").write_text(HEARTBEAT_SVG, encoding="utf-8")
+
 st.set_page_config(
     page_title="Market Pulse | ETF Screener",
-    page_icon="📊",
+    page_icon="heartbeat.svg",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -337,7 +351,20 @@ def download_market_data():
 st.markdown("""
 <div class="dashboard-header">
     <div class="header-tag">MARKET INTELLIGENCE</div>
-    <h1>📊 Market Pulse</h1>
+    <h1>
+        <svg xmlns="http://www.w3.org/2000/svg"
+             width="42"
+             height="30"
+             viewBox="0 0 100 60"
+             style="vertical-align: middle; margin-right: 9px;">
+            <path d="M3 32 H24 L32 32 L40 12 L49 49 L59 23 L66 32 H97"
+                  fill="none"
+                  stroke="#5EEAD4"
+                  stroke-width="5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"/>
+        </svg>Market Pulse
+    </h1>
     <p>Fear &amp; Greed ETF Monitoring Dashboard | Powered by Yahoo Finance</p>
 </div>
 """, unsafe_allow_html=True)
