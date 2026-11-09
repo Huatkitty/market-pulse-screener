@@ -174,6 +174,41 @@ div[data-testid="stDataFrame"] {
     overflow: hidden;
 }
 
+/* HISTORICAL BUY SIGNALS HTML TABLE */
+
+.historical-buy-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #FFFFFF;
+    color: #17243A;
+    font-size: 14px;
+}
+
+.historical-buy-table thead th {
+    background-color: #EAF0F6 !important;
+    color: #000000 !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+    padding: 13px !important;
+    border: none !important;
+}
+
+.historical-buy-table tbody td {
+    background-color: #FFFFFF !important;
+    color: #17243A !important;
+    font-weight: 400;
+    text-align: left !important;
+    padding: 13px !important;
+    border: none !important;
+    border-bottom: 1px solid #EDF1F5 !important;
+}
+
+/* ENSURE NUMBER OF SIGNALS IS LEFT-ALIGNED */
+
+.historical-buy-table tbody td:nth-child(3) {
+    text-align: left !important;
+}
+
 /* DECISION CARDS */
 
 .decision-card {
@@ -767,64 +802,19 @@ if not historical_df.empty:
 
     historical_df = historical_df.iloc[::-1]
 
-    # Match the Market Screener table's visual styling.
-    # Only the historical table header text is changed to black.
-    # Header text is normal weight, not bold.
-    # Number of Signals values are left-aligned.
+    # Render as HTML so the header colour and cell alignment
+    # are controlled directly and consistently.
 
-    historical_styled_df = (
-
-        historical_df.style
-
-        .set_properties(
-            subset=["Date", "Triggered Assets"],
-            **{
-                "color": "#17243A",
-                "background-color": "#FFFFFF",
-                "text-align": "left",
-                "padding": "13px"
-            }
-        )
-
-        .set_properties(
-            subset=["Number of Signals"],
-            **{
-                "color": "#17243A",
-                "background-color": "#FFFFFF",
-                "text-align": "left",
-                "padding": "13px"
-            }
-        )
-
-        .set_table_styles([
-
-            {
-                "selector": "th",
-                "props": [
-                    ("background-color", "#EAF0F6"),
-                    ("color", "#000000"),
-                    ("font-weight", "normal"),
-                    ("text-align", "left"),
-                    ("padding", "13px")
-                ]
-            },
-
-            {
-                "selector": "td",
-                "props": [
-                    ("border-bottom", "1px solid #EDF1F5"),
-                    ("font-size", "14px")
-                ]
-            }
-
-        ])
-
+    historical_html = historical_df.to_html(
+        index=False,
+        escape=True,
+        classes="historical-buy-table",
+        border=0
     )
 
-    st.dataframe(
-        historical_styled_df,
-        use_container_width=True,
-        hide_index=True
+    st.markdown(
+        historical_html,
+        unsafe_allow_html=True
     )
 
 else:
