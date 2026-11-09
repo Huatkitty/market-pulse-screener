@@ -229,6 +229,12 @@ div[data-testid="stDataFrame"] {
     border: none !important;
 }
 
+/* ALIGN SIGNAL HEADER WITH BUY/WATCH/HOLD VALUES */
+
+.market-screener-table thead th:nth-child(3) {
+    text-align: center !important;
+}
+
 .market-screener-table tbody td {
     border: none !important;
     border-bottom: 1px solid #EDF1F5 !important;
@@ -662,7 +668,6 @@ def colour_signal(value):
 
 # ============================================================
 # MARKET SCREENER HTML TABLE
-# SAME STYLE AS HISTORICAL BUY SIGNALS
 # ============================================================
 
 market_screener_html = screener_df.to_html(
