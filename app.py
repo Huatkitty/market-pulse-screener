@@ -339,7 +339,7 @@ def colour_fg(value):
         return "color: #FFBF00 ; font-weight: bold"
 
     else:
-        return "color: #DC2626; font-weight: bold"
+        return "color: #FF2C2C; font-weight: bold"
 
 
 # Signal text colours
@@ -353,7 +353,7 @@ def colour_signal(value):
         return "color: #FFBF00; font-weight: bold"
 
     else:
-        return "color: #DC2626; font-weight: bold"
+        return "color: #FF2C2C; font-weight: bold"
 
 
 # Table styling
